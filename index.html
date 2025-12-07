@@ -2,313 +2,452 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>千勝庫存系統</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>千勝庫存管理系統 V2.0</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
-        body { background-color: #f8f9fa; padding-bottom: 60px; }
-        .nav-bottom { position: fixed; bottom: 0; width: 100%; background: white; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); z-index: 1000; }
-        .nav-link { color: #6c757d; font-size: 0.8rem; }
-        .nav-link.active { color: #0d6efd; }
-        .scan-box { width: 100%; height: 300px; background: #000; display: none; }
-        .low-stock { background-color: #ffebee; }
+        :root {
+            --primary: #2563eb;
+            --secondary: #475569;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --bg: #f1f5f9;
+            --card: #ffffff;
+            --text: #1e293b;
+            --border: #cbd5e1;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { margin: 0; font-family: 'Noto Sans TC', sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; }
+        
+        /* 登入遮罩 */
+        #login-modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.98); z-index: 9999;
+            display: flex; justify-content: center; align-items: center; flex-direction: column;
+        }
+        
+        /* 布局與元件 */
+        header { background: var(--primary); color: white; padding: 1rem; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .logo { font-weight: 700; font-size: 1.2rem; }
+        main { flex: 1; overflow-y: auto; padding: 1rem; max-width: 800px; margin: 0 auto; width: 100%; padding-bottom: 100px; }
+        
+        .card { background: var(--card); border-radius: 12px; padding: 1.2rem; margin-bottom: 1rem; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .form-group { margin-bottom: 1rem; }
+        label { display: block; margin-bottom: 0.4rem; font-weight: 500; font-size: 0.9rem; color: var(--secondary); }
+        input, select { width: 100%; padding: 0.8rem; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem; transition: 0.2s; background: #fff; }
+        input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+        
+        /* 按鈕優化 */
+        .btn { border: none; padding: 0.8rem; border-radius: 8px; font-weight: 500; cursor: pointer; transition: 0.2s; width: 100%; font-size: 1rem; color: white; display: flex; justify-content: center; align-items: center; gap: 5px; }
+        .btn-primary { background: var(--primary); }
+        .btn-success { background: var(--success); }
+        .btn-danger { background: var(--danger); }
+        .btn-secondary { background: var(--secondary); }
+        .btn:active { transform: scale(0.98); opacity: 0.9; }
+        
+        /* 導航列 */
+        nav { position: fixed; bottom: 0; left: 0; width: 100%; background: white; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-around; padding: 0.6rem 0; z-index: 100; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); }
+        .nav-item { display: flex; flex-direction: column; align-items: center; font-size: 0.75rem; color: var(--secondary); cursor: pointer; padding: 5px; flex: 1; }
+        .nav-item.active { color: var(--primary); font-weight: bold; }
+        .nav-icon { font-size: 1.4rem; margin-bottom: 2px; }
+
+        /* 出庫列表優化 (編輯模式) */
+        .edit-row { display: flex; gap: 5px; margin-bottom: 5px; }
+        .edit-input { border: 1px solid transparent; background: transparent; padding: 2px 5px; border-radius: 4px; font-weight: bold; color: var(--text); width: 100%; }
+        .edit-input:focus { border-color: var(--primary); background: white; }
+        .edit-input.company { font-size: 0.85rem; color: #64748b; font-weight: normal; }
+        
+        .action-row { display: flex; gap: 10px; align-items: center; margin-top: 10px; background: #f8fafc; padding: 10px; border-radius: 8px; }
+        .qty-input { width: 80px; text-align: center; font-weight: bold; }
+
+        /* 視圖切換 */
+        .view-section { display: none; }
+        .view-section.active { display: block; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* 圖表容器 */
+        .chart-container { position: relative; height: 300px; width: 100%; margin-top: 20px; }
+
+        /* 打印樣式 */
+        @media print {
+            nav, header, .no-print, .form-group button { display: none !important; }
+            #qr-print-area { display: block !important; position: absolute; top: 0; left: 0; width: 100%; }
+            body { background: white; height: auto; }
+            main { padding: 0; margin: 0; max-width: none; overflow: visible; }
+        }
     </style>
 </head>
 <body>
 
-<div class="modal fade" id="loginModal" data-bs-backdrop="static" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header"><h5>🔐 安全登錄</h5></div>
-            <div class="modal-body">
-                <input type="password" id="passwordInput" class="form-control" placeholder="請輸入密碼 (預設: 123456)">
-                <div id="loginError" class="text-danger mt-2" style="display:none;">密碼錯誤</div>
+    <div id="login-modal">
+        <div class="card" style="width: 85%; max-width: 350px; text-align: center;">
+            <h2 style="color: var(--primary);">🔐 安全庫存系統</h2>
+            <div class="form-group">
+                <input type="password" id="login-pwd" placeholder="輸入密碼 (預設: 123456)">
             </div>
-            <div class="modal-footer"><button onclick="checkLogin()" class="btn btn-primary w-100">登入</button></div>
-        </div>
-    </div>
-</div>
-
-<div class="container py-3" id="mainApp" style="display:none;">
-    <h4 class="text-center mb-4 fw-bold text-primary">千勝庫存系統</h4>
-
-    <div id="section-in" class="content-section">
-        <div class="card shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title"><i class="bi bi-box-arrow-in-down"></i> 入庫作業</h5>
-                <button class="btn btn-outline-primary w-100 mb-3" onclick="startScanner('in')">📸 掃碼識別</button>
-                <div id="reader-in" class="scan-box mb-3"></div>
-                
-                <form id="inForm" onsubmit="event.preventDefault(); addStock();">
-                    <div class="mb-2">
-                        <label>產品照片</label>
-                        <input type="file" id="prodImg" class="form-control" accept="image/*" onchange="previewImage(this)">
-                        <img id="imgPreview" class="img-thumbnail mt-2" style="max-height:100px; display:none;">
-                    </div>
-                    <input type="text" id="inName" class="form-control mb-2" placeholder="品名" required>
-                    <input type="text" id="inCompany" class="form-control mb-2" placeholder="公司名稱">
-                    <input type="number" id="inQty" class="form-control mb-2" placeholder="數量" required>
-                    <input type="text" id="inCode" class="form-control mb-3" placeholder="流水號 (自動生成)" readonly>
-                    <button type="submit" class="btn btn-primary w-100">確認入庫並生成標籤</button>
-                </form>
-                <div id="qrcodeArea" class="mt-3 text-center"></div>
-            </div>
+            <button class="btn btn-primary" onclick="System.login()">進入系統</button>
         </div>
     </div>
 
-    <div id="section-out" class="content-section" style="display:none;">
-        <div class="card shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title"><i class="bi bi-box-arrow-up"></i> 出庫作業</h5>
-                <button class="btn btn-outline-danger w-100 mb-3" onclick="startScanner('out')">📸 掃碼出庫</button>
-                <div id="reader-out" class="scan-box mb-3"></div>
-                <input type="text" id="searchOut" class="form-control mb-3" placeholder="🔍 搜尋品名/編號/公司..." onkeyup="renderOutList()">
-                <div id="outList" class="list-group"></div>
-            </div>
-        </div>
-    </div>
+    <header>
+        <div class="logo">📦 雲端庫存 V2</div>
+        <button class="btn" style="background: rgba(255,255,255,0.2); width: auto; font-size: 0.8rem; padding: 5px 10px;" onclick="System.changePassword()">改密碼</button>
+    </header>
 
-    <div id="section-db" class="content-section" style="display:none;">
-        <div class="card shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title"><i class="bi bi-database"></i> 庫存總表</h5>
-                <div class="d-flex gap-2 mb-3">
-                    <button class="btn btn-success flex-grow-1" onclick="exportCSV()">📤 匯出報表</button>
-                    <button class="btn btn-info flex-grow-1 text-white" onclick="window.print()">🖨️ 列印清單</button>
+    <main>
+        <section id="view-inbound" class="view-section active">
+            <h2>📥 產品入庫</h2>
+            <div class="card">
+                <div class="form-group"><label>公司 / 供應商</label><input type="text" id="in-company"></div>
+                <div class="form-group"><label>產品名稱</label><input type="text" id="in-name"></div>
+                <div class="form-group"><label>初始數量</label><input type="number" id="in-qty"></div>
+                <div class="form-group"><label>安全庫存警示</label><input type="number" id="in-min" value="10"></div>
+                <button class="btn btn-primary" onclick="Inventory.add()">📸 入庫並生成 QR</button>
+            </div>
+
+            <div id="qr-result" class="card" style="display:none; text-align: center;">
+                <h3 style="color:var(--success)">✅ 入庫成功</h3>
+                <p id="new-item-id" style="font-family: monospace; background: #f1f5f9; padding: 5px;"></p>
+                <div id="qrcode" style="display: flex; justify-content: center; margin: 15px 0;"></div>
+                <button class="btn btn-secondary" onclick="System.printLabel()">🖨️ 打印標籤</button>
+            </div>
+        </section>
+
+        <section id="view-outbound" class="view-section">
+            <h2>📤 產品出庫與管理</h2>
+            <div class="card">
+                <button class="btn btn-primary" onclick="Scanner.start()" style="margin-bottom: 10px;">📷 掃描 QR Code</button>
+                <div id="reader"></div>
+                <input type="text" id="out-search" oninput="Inventory.searchOutbound()" placeholder="🔍 搜尋 品名 / 公司 / ID..." style="margin-top:10px;">
+            </div>
+
+            <div id="outbound-list">
                 </div>
-                <input type="text" id="dbSearch" class="form-control mb-2" placeholder="多條件搜尋..." onkeyup="renderDbTable()">
-                <select id="dbCompanyFilter" class="form-select mb-3" onchange="renderDbTable()">
-                    <option value="">全部公司</option>
-                </select>
-                <div class="table-responsive">
-                    <table class="table table-bordered table-sm" id="dbTable">
-                        <thead class="table-light"><tr><th>圖</th><th>品名</th><th>公司</th><th>庫存</th><th>狀態</th></tr></thead>
-                        <tbody></tbody>
+        </section>
+
+        <section id="view-db" class="view-section">
+            <h2>📊 庫存總表</h2>
+            <div class="card">
+                <h3 style="margin-top:0">📈 庫存統計圖表</h3>
+                <div class="chart-container">
+                    <canvas id="stockChart"></canvas>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>📋 詳細清單</h3>
+                <div style="display: flex; gap: 10px; margin-bottom: 1rem;">
+                    <select id="filter-company" onchange="Inventory.renderTable()"><option value="">全部公司</option></select>
+                    <button class="btn btn-success" style="width: auto;" onclick="Inventory.exportCSV()">匯出 Excel</button>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                        <thead style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
+                            <tr>
+                                <th style="padding: 8px; text-align: left;">品名</th>
+                                <th style="padding: 8px; text-align: left;">公司</th>
+                                <th style="padding: 8px; text-align: center;">庫存</th>
+                                <th style="padding: 8px; text-align: right;">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="db-table-body"></tbody>
                     </table>
                 </div>
-                <canvas id="stockChart" class="mt-4"></canvas>
             </div>
-        </div>
-    </div>
-</div>
+        </section>
+    </main>
 
-<nav class="nav-bottom py-2">
-    <div class="row text-center m-0">
-        <div class="col" onclick="showSection('in')"><i class="bi bi-box-arrow-in-down fs-4"></i><div class="small">入庫</div></div>
-        <div class="col" onclick="showSection('out')"><i class="bi bi-box-arrow-up fs-4"></i><div class="small">出庫</div></div>
-        <div class="col" onclick="showSection('db')"><i class="bi bi-database fs-4"></i><div class="small">資料庫</div></div>
+    <nav>
+        <div class="nav-item active" onclick="System.switchTab('view-inbound', this)">
+            <span class="nav-icon">📥</span><span>入庫</span>
+        </div>
+        <div class="nav-item" onclick="System.switchTab('view-outbound', this)">
+            <span class="nav-icon">📤</span><span>出庫/編輯</span>
+        </div>
+        <div class="nav-item" onclick="System.switchTab('view-db', this)">
+            <span class="nav-icon">📊</span><span>報表</span>
+        </div>
+    </nav>
+
+    <div id="qr-print-area" style="display: none; text-align: center; padding: 20px;">
+        <h2 id="print-company"></h2>
+        <h1 id="print-name" style="font-size: 2.5rem; margin: 10px 0;"></h1>
+        <div id="print-qr-target" style="margin: 20px auto;"></div>
+        <p id="print-id" style="font-family: monospace;"></p>
+        <p id="print-date"></p>
     </div>
-</nav>
 
 <script>
-    let inventory = JSON.parse(localStorage.getItem('inventory')) || [];
-    let html5QrCode;
+const DB_KEY = 'inventory_v2';
+const AUTH_KEY = 'inventory_auth_v2';
 
-    // 初始化
-    window.onload = function() {
-        new bootstrap.Modal(document.getElementById('loginModal')).show();
-        generateCode();
-    };
+const System = {
+    password: localStorage.getItem(AUTH_KEY) || '123456',
+    
+    login: () => {
+        if(document.getElementById('login-pwd').value === System.password) {
+            document.getElementById('login-modal').style.display = 'none';
+            Inventory.init();
+        } else alert('密碼錯誤');
+    },
 
-    function checkLogin() {
-        if(document.getElementById('passwordInput').value === '123456') {
-            bootstrap.Modal.getInstance(document.getElementById('loginModal')).hide();
-            document.getElementById('mainApp').style.display = 'block';
-            renderOutList();
-            renderDbTable();
-        } else {
-            document.getElementById('loginError').style.display = 'block';
+    changePassword: () => {
+        const p = prompt('輸入新密碼');
+        if(p) { System.password = p; localStorage.setItem(AUTH_KEY, p); alert('已更新'); }
+    },
+
+    switchTab: (id, el) => {
+        document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        if(el) el.classList.add('active');
+        
+        if (id === 'view-db') {
+            Inventory.renderTable();
+            Inventory.renderChart(); // 切換到報表頁面時繪製圖表
         }
-    }
+        if (id !== 'view-outbound' && Scanner.html5QrCode) Scanner.stop();
+    },
 
-    function showSection(id) {
-        document.querySelectorAll('.content-section').forEach(el => el.style.display = 'none');
-        document.getElementById('section-' + id).style.display = 'block';
-        if(id === 'db') renderDbTable();
-        if(id === 'out') renderOutList();
-        if(html5QrCode) html5QrCode.stop();
+    printLabel: () => {
+        document.getElementById('print-qr-target').innerHTML = document.getElementById('qrcode').innerHTML;
+        window.print();
     }
+};
 
-    function generateCode() {
-        document.getElementById('inCode').value = 'PROD-' + Date.now().toString().slice(-6);
-    }
+const Inventory = {
+    data: [],
+    chartInstance: null,
 
-    function previewImage(input) {
-        if (input.files && input.files[0]) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                document.getElementById('imgPreview').src = e.target.result;
-                document.getElementById('imgPreview').style.display = 'block';
-            }
-            reader.readAsDataURL(input.files[0]);
-        }
-    }
+    init: () => {
+        const s = localStorage.getItem(DB_KEY);
+        if(s) Inventory.data = JSON.parse(s);
+        Inventory.updateFilters();
+        Inventory.searchOutbound();
+    },
 
-    function addStock() {
-        const item = {
-            id: document.getElementById('inCode').value,
-            name: document.getElementById('inName').value,
-            company: document.getElementById('inCompany').value,
-            qty: parseInt(document.getElementById('inQty').value),
-            img: document.getElementById('imgPreview').src || '',
-            date: new Date().toISOString().split('T')[0]
-        };
+    save: () => {
+        localStorage.setItem(DB_KEY, JSON.stringify(Inventory.data));
+        Inventory.updateFilters();
+    },
+
+    add: () => {
+        const c = document.getElementById('in-company').value;
+        const n = document.getElementById('in-name').value;
+        const q = parseInt(document.getElementById('in-qty').value);
+        const m = parseInt(document.getElementById('in-min').value);
+
+        if(!c || !n || isNaN(q)) return alert('請填寫完整');
+
+        const id = 'INV-' + Date.now().toString().slice(-6);
+        const item = { id, company: c, name: n, qty: q, min: m, date: new Date().toISOString().split('T')[0] };
         
-        // 檢查是否已存在
-        const existing = inventory.find(x => x.id === item.id);
-        if(existing) existing.qty += item.qty;
-        else inventory.push(item);
-        
-        saveData();
-        alert('入庫成功！');
-        
-        // 生成 QR Code
-        const qrDiv = document.getElementById('qrcodeArea');
-        qrDiv.innerHTML = '';
-        new QRCode(qrDiv, { text: item.id, width: 128, height: 128 });
-        
-        // 重置表單
-        document.getElementById('inForm').reset();
-        document.getElementById('imgPreview').style.display = 'none';
-        generateCode();
-    }
+        Inventory.data.unshift(item);
+        Inventory.save();
 
-    function renderOutList() {
-        const term = document.getElementById('searchOut').value.toLowerCase();
-        const list = document.getElementById('outList');
+        // 顯示結果
+        document.getElementById('qr-result').style.display = 'block';
+        document.getElementById('new-item-id').innerText = id;
+        document.getElementById('qrcode').innerHTML = '';
+        new QRCode(document.getElementById("qrcode"), { text: id, width: 128, height: 128 });
+        
+        // 準備打印
+        document.getElementById('print-company').innerText = c;
+        document.getElementById('print-name').innerText = n;
+        document.getElementById('print-id').innerText = id;
+        document.getElementById('print-date').innerText = item.date;
+
+        document.getElementById('in-name').value = '';
+        document.getElementById('in-qty').value = '';
+        alert(`已入庫: ${n}`);
+    },
+
+    // --- 核心功能：出庫與編輯 ---
+    searchOutbound: (q = '') => {
+        const v = q || document.getElementById('out-search').value.toLowerCase();
+        const list = document.getElementById('outbound-list');
         list.innerHTML = '';
-        
-        inventory.filter(i => 
-            i.name.toLowerCase().includes(term) || 
-            i.id.toLowerCase().includes(term) ||
-            i.company.toLowerCase().includes(term)
-        ).forEach(item => {
+
+        const res = Inventory.data.filter(i => 
+            i.name.toLowerCase().includes(v) || i.id.toLowerCase().includes(v) || i.company.toLowerCase().includes(v)
+        );
+
+        if(res.length === 0) { list.innerHTML = '<p style="text-align:center;color:#999">無資料</p>'; return; }
+
+        res.forEach(item => {
+            const isLow = item.qty <= item.min;
             const div = document.createElement('div');
-            div.className = `list-group-item d-flex justify-content-between align-items-center ${item.qty < 5 ? 'low-stock' : ''}`;
+            div.className = 'card';
+            div.style.borderLeft = isLow ? '5px solid red' : '5px solid green';
+            
+            // 允許直接編輯品名與公司
             div.innerHTML = `
-                <div class="d-flex align-items-center">
-                    ${item.img ? `<img src="${item.img}" style="width:40px;height:40px;object-fit:cover;margin-right:10px;">` : ''}
-                    <div>
-                        <div class="fw-bold">${item.name}</div>
-                        <small class="text-muted">${item.company} | 庫存: ${item.qty}</small>
-                        ${item.qty < 5 ? '<span class="badge bg-danger">低庫存</span>' : ''}
+                <div style="margin-bottom:8px;">
+                    <small style="color:#999">${item.id}</small>
+                    <div class="edit-row">
+                        <input class="edit-input" value="${item.name}" 
+                            onchange="Inventory.updateInfo('${item.id}', 'name', this.value)" placeholder="品名">
+                    </div>
+                    <div class="edit-row">
+                        <input class="edit-input company" value="${item.company}" 
+                            onchange="Inventory.updateInfo('${item.id}', 'company', this.value)" placeholder="公司">
                     </div>
                 </div>
-                <button class="btn btn-sm btn-outline-danger" onclick="updateStock('${item.id}', -1)">-1</button>
+                
+                <div style="display:flex; justify-content:space-between; align-items:center; background:#f1f5f9; padding:10px; border-radius:8px;">
+                    <div style="font-weight:bold; ${isLow?'color:red':''}">
+                        目前庫存: ${item.qty}
+                    </div>
+                    <div style="display:flex; gap:5px;">
+                        <input type="number" id="out-qty-${item.id}" class="qty-input" placeholder="數量">
+                        <button class="btn btn-danger" style="width:auto; padding:5px 15px;" 
+                            onclick="Inventory.processOut('${item.id}')">出庫</button>
+                    </div>
+                </div>
             `;
             list.appendChild(div);
         });
-    }
+    },
 
-    function renderDbTable() {
-        const term = document.getElementById('dbSearch').value.toLowerCase();
-        const companyFilter = document.getElementById('dbCompanyFilter').value;
-        const tbody = document.querySelector('#dbTable tbody');
-        tbody.innerHTML = '';
-        
-        // 更新公司篩選選單
-        const companies = [...new Set(inventory.map(i => i.company))];
-        const select = document.getElementById('dbCompanyFilter');
-        if(select.options.length === 1) {
-            companies.forEach(c => select.add(new Option(c, c)));
+    // 更新產品資料 (品名/公司)
+    updateInfo: (id, field, val) => {
+        const item = Inventory.data.find(i => i.id === id);
+        if(item) {
+            item[field] = val;
+            Inventory.save();
+            // 不刷新整個列表以免打斷輸入體驗，但需要在背景更新數據
+            console.log('Updated', field, val);
         }
+    },
 
-        const filtered = inventory.filter(i => 
-            (i.name.toLowerCase().includes(term) || i.id.toLowerCase().includes(term)) &&
-            (companyFilter === '' || i.company === companyFilter)
-        );
+    // 處理出庫 (讀取輸入框)
+    processOut: (id) => {
+        const input = document.getElementById(`out-qty-${id}`);
+        const val = parseInt(input.value);
+        if(!val || val <= 0) return alert('請輸入有效數量');
+        
+        Inventory.updateStock(id, -val);
+        input.value = ''; // 清空輸入框
+    },
 
-        filtered.forEach(item => {
+    updateStock: (id, change) => {
+        const item = Inventory.data.find(i => i.id === id);
+        if(item) {
+            if(item.qty + change < 0) return alert('庫存不足!');
+            item.qty += change;
+            Inventory.save();
+            
+            // 局部更新顯示文字，提升效能
+            Inventory.searchOutbound(); 
+            alert(`出庫成功！剩餘: ${item.qty}`);
+        }
+    },
+
+    // --- 資料庫與圖表 ---
+    renderTable: () => {
+        const tbody = document.getElementById('db-table-body');
+        const filter = document.getElementById('filter-company').value;
+        tbody.innerHTML = '';
+
+        Inventory.data.filter(i => !filter || i.company === filter).forEach(item => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td>${item.img ? `<img src="${item.img}" style="width:30px">` : ''}</td>
-                <td contenteditable onblur="updateField('${item.id}', 'name', this.innerText)">${item.name}</td>
-                <td contenteditable onblur="updateField('${item.id}', 'company', this.innerText)">${item.company}</td>
-                <td>${item.qty}</td>
-                <td>${item.qty < 5 ? '⚠️' : '✅'}</td>
+                <td style="padding:8px;">${item.name}</td>
+                <td style="padding:8px; font-size:0.9em; color:#666">${item.company}</td>
+                <td style="padding:8px; text-align:center; font-weight:bold; ${item.qty<=item.min?'color:red':''}">${item.qty}</td>
+                <td style="padding:8px; text-align:right;">
+                    <button class="btn btn-danger" style="font-size:0.8rem; padding:4px 8px; width:auto; display:inline-block;" onclick="if(confirm('確定刪除?')) Inventory.delete('${item.id}')">刪除</button>
+                </td>
             `;
             tbody.appendChild(tr);
         });
+    },
 
-        updateChart(filtered);
-    }
-
-    function updateStock(id, change) {
-        const item = inventory.find(i => i.id === id);
-        if(item) {
-            item.qty += change;
-            if(item.qty < 0) item.qty = 0;
-            saveData();
-            renderOutList();
-            renderDbTable();
-        }
-    }
-
-    function updateField(id, field, value) {
-        const item = inventory.find(i => i.id === id);
-        if(item) {
-            item[field] = value;
-            saveData();
-        }
-    }
-
-    function saveData() {
-        localStorage.setItem('inventory', JSON.stringify(inventory));
-    }
-
-    function startScanner(mode) {
-        const readerId = mode === 'in' ? 'reader-in' : 'reader-out';
-        document.getElementById(readerId).style.display = 'block';
-        html5QrCode = new Html5Qrcode(readerId);
-        html5QrCode.start(
-            { facingMode: "environment" },
-            { fps: 10, qrbox: 250 },
-            (decodedText) => {
-                if(mode === 'in') {
-                    // 入庫模式邏輯...
-                    alert('掃描到: ' + decodedText);
-                } else {
-                    document.getElementById('searchOut').value = decodedText;
-                    renderOutList();
-                }
-                html5QrCode.stop();
-                document.getElementById(readerId).style.display = 'none';
-            },
-            (errorMessage) => {}
-        );
-    }
-
-    function updateChart(data) {
+    renderChart: () => {
         const ctx = document.getElementById('stockChart').getContext('2d');
-        if(window.myChart) window.myChart.destroy();
-        window.myChart = new Chart(ctx, {
+        
+        // 準備數據：合併相同品名的數量 (如果需要分別列出，可直接 map)
+        const labels = Inventory.data.map(i => i.name);
+        const data = Inventory.data.map(i => i.qty);
+        const colors = data.map(q => q < 10 ? 'rgba(239, 68, 68, 0.7)' : 'rgba(37, 99, 235, 0.7)');
+
+        if (Inventory.chartInstance) Inventory.chartInstance.destroy();
+
+        Inventory.chartInstance = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: data.map(i => i.name),
+                labels: labels,
                 datasets: [{
                     label: '庫存數量',
-                    data: data.map(i => i.qty),
-                    backgroundColor: 'rgba(54, 162, 235, 0.5)'
+                    data: data,
+                    backgroundColor: colors,
+                    borderColor: colors.map(c => c.replace('0.7', '1')),
+                    borderWidth: 1
                 }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true }
+                },
+                plugins: {
+                    legend: { display: false },
+                    title: { display: true, text: '各項產品庫存總量' }
+                }
             }
         });
-    }
-    
-    function exportCSV() {
-        let csv = "ID,品名,公司,數量,日期\n";
-        inventory.forEach(i => {
-            csv += `${i.id},${i.name},${i.company},${i.qty},${i.date}\n`;
+    },
+
+    delete: (id) => {
+        Inventory.data = Inventory.data.filter(i => i.id !== id);
+        Inventory.save();
+        Inventory.renderTable();
+        Inventory.renderChart();
+    },
+
+    updateFilters: () => {
+        const sel = document.getElementById('filter-company');
+        const cur = sel.value;
+        const s = new Set(Inventory.data.map(i => i.company));
+        sel.innerHTML = '<option value="">全部公司</option>';
+        s.forEach(c => {
+            const op = document.createElement('option');
+            op.value = op.innerText = c;
+            sel.appendChild(op);
         });
-        const blob = new Blob(["\uFEFF"+csv], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.download = "inventory.csv";
-        link.click();
+        sel.value = cur;
+    },
+
+    exportCSV: () => {
+        let csv = "\uFEFF公司,品名,庫存,ID,日期\n";
+        Inventory.data.forEach(i => csv += `${i.company},${i.name},${i.qty},${i.id},${i.date}\n`);
+        const a = document.createElement('a');
+        a.href = 'data:text/csv;charset=utf-8,' + encodeURI(csv);
+        a.download = 'inventory.csv';
+        a.click();
     }
+};
+
+const Scanner = {
+    html5QrCode: null,
+    start: () => {
+        Scanner.html5QrCode = new Html5Qrcode("reader");
+        Scanner.html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (txt) => {
+            document.getElementById('out-search').value = txt;
+            Inventory.searchOutbound(txt);
+            Scanner.stop();
+        }).catch(e => alert('無法啟動相機'));
+    },
+    stop: () => { if(Scanner.html5QrCode) Scanner.html5QrCode.stop().then(()=>Scanner.html5QrCode.clear()); }
+};
+
+window.onload = () => { if(localStorage.getItem(DB_KEY)) Inventory.init(); };
 </script>
 </body>
 </html>
